@@ -3,823 +3,758 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Void Weaver</title>
+    <title>VOID WEAVER</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg: #0f1115; /* Deep Slate */
+            --ui-bg: rgba(20, 25, 30, 0.6);
+            --player: #ffb347; /* Warm Amber */
+            --player-glow: rgba(255, 179, 71, 0.4);
+            --target: #3dffc2; /* Soft Mint/Cyan */
+            --target-glow: rgba(61, 255, 194, 0.4);
+            --singularity: #4dc3ff; /* Electric Blue */
+            --danger: #ff4d4d; /* Muted Red */
+            --text: #e0e0e0;
+            --text-dim: #8a8a9a;
         }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         
         body {
             overflow: hidden;
-            background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%);
-            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             cursor: none;
             touch-action: none;
             height: 100vh;
-            width: 100vw;
+            color: var(--text);
         }
         
+        /* Canvas Setup */
         #gameCanvas {
-            display: block;
-            touch-action: none;
+            position: fixed;
+            top: 0; left: 0;
+            filter: contrast(1.1) saturate(1.1);
+        }
+        /* The Bloom Layer - creates the glowing effect */
+        #bloomCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            filter: blur(15px) brightness(1.4);
+            opacity: 0.7;
+            pointer-events: none;
+            mix-blend-mode: screen;
         }
         
+        /* Custom Cursor */
         #cursor {
             position: fixed;
             pointer-events: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 180, 50, 0.8);
+            width: 24px; height: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            transition: transform 0.1s ease, border-color 0.2s ease, width 0.2s, height 0.2s;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                        width 0.2s, height 0.2s, border-color 0.2s, background 0.2s;
             z-index: 1000;
-            box-shadow: 0 0 10px rgba(255, 180, 50, 0.4);
-        }
-        
-        #cursor.active {
-            width: 40px;
-            height: 40px;
-            border-color: #ff6b35;
-            border-width: 3px;
+            mix-blend-mode: difference;
         }
         
         #cursor::after {
             content: '';
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 4px;
-            height: 4px;
-            background: #ffb432;
+            top: 50%; left: 50%;
+            width: 4px; height: 4px;
+            background: #fff;
             border-radius: 50%;
             transform: translate(-50%, -50%);
         }
         
-        #ui {
+        #cursor.active {
+            width: 60px; height: 60px;
+            border-color: var(--player);
+            background: rgba(255, 179, 71, 0.1);
+            border-style: solid;
+        }
+        
+        /* Modern "Glass" UI */
+        #ui-container {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            color: #e0e0e0;
-            z-index: 100;
+            top: 0; left: 0; right: 0;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
             pointer-events: none;
-            user-select: none;
+            z-index: 100;
         }
         
-        #score {
-            font-size: 28px;
-            font-weight: bold;
-            color: #ffb432;
-            text-shadow: 0 0 15px rgba(255, 180, 50, 0.6);
-            transition: transform 0.1s;
+        .glass-panel {
+            background: var(--ui-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px 25px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         }
         
-        #level {
-            font-size: 14px;
-            color: #aaa;
-            margin-top: 5px;
+        .score-block h2 {
+            font-size: 42px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+        
+        .score-block p {
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            color: var(--player);
+            margin-top: 5px;
+            font-weight: 600;
         }
         
-        #combo {
-            font-size: 20px;
-            color: #ff6b35;
-            margin-top: 10px;
-            opacity: 0;
-            transform: scale(0.8);
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .objective-block {
+            text-align: right;
+            min-width: 180px;
         }
         
-        #combo.active {
-            opacity: 1;
-            transform: scale(1);
+        .obj-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+            font-weight: 600;
         }
         
-        #instructions {
+        .progress-ring {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--target), var(--singularity));
+            border-radius: 2px;
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px var(--target);
+        }
+        
+        .obj-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--target);
+            font-weight: bold;
+        }
+        
+        /* Entropy Bar */
+        #entropy-container {
             position: fixed;
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 14px;
+            width: 240px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .entropy-label {
+            font-size: 10px;
+            letter-spacing: 1px;
+            color: var(--text-dim);
             text-align: center;
-            z-index: 100;
-            pointer-events: none;
-            transition: opacity 1s ease;
-            background: rgba(0,0,0,0.3);
-            padding: 10px 20px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 5px;
+            text-transform: uppercase;
         }
         
-        #targetIndicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            color: #4ecdc4;
-            font-size: 14px;
-            z-index: 100;
-            pointer-events: none;
-            text-align: right;
-        }
-        
-        #progressBar {
-            width: 120px;
-            height: 6px;
+        .entropy-track {
+            width: 100%;
+            height: 2px;
             background: rgba(255,255,255,0.1);
-            border-radius: 3px;
-            margin-top: 8px;
-            overflow: hidden;
-            border: 1px solid rgba(78, 205, 196, 0.3);
+            border-radius: 1px;
         }
         
-        #progressFill {
+        .entropy-fill {
             height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4ecdc4, #44a08d);
-            border-radius: 3px;
-            transition: width 0.3s ease;
+            width: 100%;
+            background: var(--player);
+            box-shadow: 0 0 10px var(--player-glow);
+            transition: width 0.1s linear;
         }
         
-        #gameOver {
+        /* Level Up Overlay */
+        #overlay-text {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(10, 10, 15, 0.95);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            font-size: 42px;
+            font-weight: 800;
+            color: transparent;
+            -webkit-text-stroke: 1px rgba(255,255,255,0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 150;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+        }
+        
+        #overlay-text.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        /* Floater Text */
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(0.8); opacity: 0; }
+        }
+        .floater {
+            position: absolute;
+            color: var(--target);
+            font-weight: 700;
+            font-size: 16px;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 0 0 5px var(--target-glow);
+        }
+        
+        /* Game Over Screen */
+        #game-over {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 17, 21, 0.95);
             display: none;
             justify-content: center;
             align-items: center;
             flex-direction: column;
             z-index: 200;
+            backdrop-filter: blur(20px);
         }
         
-        #gameOver h1 {
-            font-size: 42px;
-            color: #ffb432;
-            text-shadow: 0 0 40px rgba(255, 180, 50, 0.5);
+        #game-over h1 {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(45deg, var(--player), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
-            letter-spacing: 4px;
         }
         
-        #gameOver p {
-            color: #888;
+        #game-over p {
             margin-bottom: 40px;
-            font-size: 18px;
+            color: var(--text-dim);
         }
         
-        #finalScore {
-            color: #4ecdc4;
-            font-weight: bold;
-        }
-        
-        .btn {
+        button {
             background: transparent;
-            border: 2px solid #ffb432;
-            color: #ffb432;
-            padding: 15px 40px;
-            font-size: 16px;
-            font-family: inherit;
+            border: 1px solid var(--player);
+            color: var(--player);
+            padding: 15px 50px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 3px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: 0.3s;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            pointer-events: auto;
+            border-radius: 30px;
         }
         
-        .btn:hover {
-            background: #ffb432;
-            color: #0a0a0f;
-            box-shadow: 0 0 20px rgba(255, 180, 50, 0.4);
-        }
-        
-        #levelUp {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0.8);
-            font-size: 32px;
-            color: #4ecdc4;
-            text-shadow: 0 0 30px rgba(78, 205, 196, 0.8);
-            opacity: 0;
-            z-index: 150;
-            pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            letter-spacing: 4px;
-        }
-        
-        #levelUp.show {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
+        button:hover {
+            background: var(--player);
+            color: #000;
+            box-shadow: 0 0 30px var(--player-glow);
         }
     </style>
 </head>
 <body>
+
+    <!-- Render Layers -->
+    <canvas id="bloomCanvas"></canvas>
     <canvas id="gameCanvas"></canvas>
+    
     <div id="cursor"></div>
     
-    <div id="ui">
-        <div id="score">0</div>
-        <div id="level">Level 1</div>
-        <div id="combo">SINGULARITY x1</div>
-    </div>
+    <div id="overlay-text">Sector Clear</div>
     
-    <div id="targetIndicator">
-        <span id="targetCount">0 / 5</span>
-        <div id="progressBar">
-            <div id="progressFill"></div>
+    <!-- Top UI -->
+    <div id="ui-container">
+        <div class="glass-panel score-block">
+            <h2 id="score-val">0</h2>
+            <p id="level-val">Sector 1</p>
+        </div>
+        
+        <div class="glass-panel objective-block">
+            <div class="obj-title">Extraction</div>
+            <div class="progress-ring"><div class="progress-fill" id="obj-fill"></div></div>
+            <div class="obj-text" id="obj-text">0 / 5</div>
         </div>
     </div>
     
-    <div id="instructions">
-        Hold to create Voids. Guide Cyan Particles to the Rings.
+    <!-- Bottom UI -->
+    <div id="entropy-container">
+        <div class="entropy-label">Entropy Levels</div>
+        <div class="entropy-track"><div class="entropy-fill" id="entropy-fill"></div></div>
     </div>
     
-    <div id="levelUp">LEVEL UP</div>
-    
-    <div id="gameOver">
-        <h1>VOID COLLAPSED</h1>
-        <p>Final Score: <span id="finalScore">0</span></p>
-        <button class="btn" id="restartBtn">WEAVE AGAIN</button>
+    <div id="game-over">
+        <h1>Void Collapse</h1>
+        <p>Final Score: <span id="final-score">0</span></p>
+        <button id="restart-btn">Try Again</button>
     </div>
 
     <script>
+        // --- Setup ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const cursor = document.getElementById('cursor');
-        const scoreEl = document.getElementById('score');
-        const levelEl = document.getElementById('level');
-        const comboEl = document.getElementById('combo');
-        const targetCountEl = document.getElementById('targetCount');
-        const progressFill = document.getElementById('progressFill');
-        const instructionsEl = document.getElementById('instructions');
-        const levelUpEl = document.getElementById('levelUp');
-        const gameOverEl = document.getElementById('gameOver');
-        const finalScoreEl = document.getElementById('finalScore');
-        const restartBtn = document.getElementById('restartBtn');
-
+        const bloomCanvas = document.getElementById('bloomCanvas');
+        const bloomCtx = bloomCanvas.getContext('2d');
+        
         let W, H;
-        let particles = [];
-        let voids = [];
-        let targets = []; // Zones to fill
-        let score = 0;
-        let level = 1;
-        let targetsCollected = 0;
-        let totalTargets = 5;
-        let isPlaying = true;
-        
-        // Initialize mouse to center to prevent (0,0) bug
-        let mouseX = window.innerWidth / 2;
-        let mouseY = window.innerHeight / 2;
-        let isMouseDown = false;
-        let combo = 0;
-        let comboTimer = 0;
-        let singularityBonus = 0;
-        let gameStarted = false;
-        
-        // Fix Delta Time initialization
-        let lastTime = performance.now();
-
-        const VOID_STRENGTH = 400; // Increased for better control
-        const VOID_RADIUS = 100;
-        const VOID_DECAY = 0.012;
-        const PARTICLE_COUNT_BASE = 150;
-        const TARGET_PARTICLES_COUNT = 5; // Particles per target zone
-
         function resize() {
-            W = canvas.width = window.innerWidth;
-            H = canvas.height = window.innerHeight;
+            W = canvas.width = bloomCanvas.width = window.innerWidth;
+            H = canvas.height = bloomCanvas.height = window.innerHeight;
         }
-        
         window.addEventListener('resize', resize);
         resize();
 
+        // --- Config ---
+        const CFG = {
+            particleCount: 150,
+            voidStrength: 600,
+            voidDecay: 0.015,
+            targetCapacity: 5
+        };
+
+        // --- State ---
+        let state = {
+            particles: [],
+            voids: [],
+            targets: [],
+            repulsors: [],
+            score: 0,
+            level: 1,
+            entropy: 100,
+            filled: 0,
+            total: 5,
+            playing: true,
+            shake: 0
+        };
+        
+        let mouse = { x: W/2, y: H/2, down: false };
+        let lastTime = performance.now();
+
+        // --- Classes ---
         class Particle {
-            constructor(x, y, type = 'ambient') {
-                this.x = Number.isFinite(x) ? x : W / 2;
-                this.y = Number.isFinite(y) ? y : H / 2;
+            constructor(x, y, type) {
+                this.x = x || Math.random() * W;
+                this.y = y || Math.random() * H;
                 this.vx = (Math.random() - 0.5) * 2;
                 this.vy = (Math.random() - 0.5) * 2;
-                this.type = type; // 'ambient' or 'target'
-                
-                if (this.type === 'target') {
-                    this.radius = 4;
-                    this.hue = 170; // Cyan
-                    this.alpha = 1;
-                } else {
-                    this.radius = Math.random() * 2 + 1;
-                    this.hue = Math.random() * 40 + 20; // Orange/Gold
-                    this.alpha = Math.random() * 0.4 + 0.2;
-                }
-                
-                this.baseRadius = this.radius;
+                this.type = type;
+                this.radius = type === 'target' ? 3.5 : 1.5;
                 this.collected = false;
-                this.pulsePhase = Math.random() * Math.PI * 2;
+                // Color: Mint for targets, Amber for ambient
+                this.rgb = type === 'target' ? '61, 255, 194' : '255, 179, 71'; 
             }
 
             update(dt) {
                 if (this.collected) return;
-                if (!isPlaying) return;
                 
-                this.pulsePhase += dt * 3;
+                let fx = 0, fy = 0;
                 
-                let totalForceX = 0;
-                let totalForceY = 0;
-                let inVoid = false;
-
-                // Apply Void Forces
-                for (let v of voids) {
-                    if (v.life <= 0) continue;
-                    
+                // Voids (Pull)
+                state.voids.forEach(v => {
                     const dx = v.x - this.x;
                     const dy = v.y - this.y;
-                    const distSq = dx * dx + dy * dy;
-                    const dist = Math.sqrt(distSq);
-                    
-                    if (Number.isFinite(dist) && dist > 5) {
-                        // Gravitational pull formula
-                        // Force = Strength / distance^2 (clamped)
-                        let force = (v.strength * v.life) / distSq;
-                        
-                        // Singularity bonus
-                        if (v.isSingularity) force *= 1.5;
-                        
-                        // Clamp force to prevent explosion
-                        force = Math.min(force, 100); 
-                        
-                        totalForceX += (dx / dist) * force;
-                        totalForceY += (dy / dist) * force;
-                        
-                        if (dist < v.radius) inVoid = true;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist > 5) {
+                        const force = (v.strength * v.life) / (dist*dist);
+                        // Blue singularities pull stronger
+                        const pullMod = v.isSingularity ? 1.5 : 1;
+                        fx += (dx/dist) * Math.min(force * pullMod, 200);
+                        fy += (dy/dist) * Math.min(force * pullMod, 200);
                     }
-                }
-
-                this.vx += totalForceX * dt;
-                this.vy += totalForceY * dt;
+                });
                 
-                // Drag
+                // Repulsors (Push)
+                state.repulsors.forEach(r => {
+                    const dx = this.x - r.x;
+                    const dy = this.y - r.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < r.radius + 50) {
+                         const force = r.strength / (dist*dist);
+                         fx += (dx/dist) * Math.min(force, 400);
+                         fy += (dy/dist) * Math.min(force, 400);
+                    }
+                });
+
+                this.vx += fx * dt;
+                this.vy += fy * dt;
                 this.vx *= 0.96;
                 this.vy *= 0.96;
                 
-                // Speed limit
-                const maxSpeed = 400;
-                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                if (speed > maxSpeed) {
-                    this.vx = (this.vx / speed) * maxSpeed;
-                    this.vy = (this.vy / speed) * maxSpeed;
-                }
+                const speed = Math.hypot(this.vx, this.vy);
+                if (speed > 500) { this.vx = (this.vx/speed)*500; this.vy = (this.vy/speed)*500; }
 
                 this.x += this.vx * dt;
                 this.y += this.vy * dt;
-
-                // Boundary Wrap
-                if (this.x < -50) this.x = W + 50;
-                if (this.x > W + 50) this.x = -50;
-                if (this.y < -50) this.y = H + 50;
-                if (this.y > H + 50) this.y = -50;
-
-                // Visual pulse
-                this.radius = this.baseRadius * (inVoid ? 0.5 : 1) * (1 + Math.sin(this.pulsePhase) * 0.2);
+                
+                if (this.x < 0) this.x = W; if (this.x > W) this.x = 0;
+                if (this.y < 0) this.y = H; if (this.y > H) this.y = 0;
             }
 
-            draw() {
+            draw(context) {
                 if (this.collected) return;
                 
-                const glow = this.type === 'target' ? 15 : 5;
-                const color = `hsla(${this.hue}, 80%, 60%, ${this.alpha})`;
-                
                 // Glow
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, Math.max(0.5, this.radius + glow), 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${this.alpha * 0.15})`;
-                ctx.fill();
-
+                const grd = context.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 3);
+                grd.addColorStop(0, `rgba(${this.rgb}, 1)`);
+                grd.addColorStop(1, `rgba(${this.rgb}, 0)`);
+                
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
+                context.fillStyle = grd;
+                context.fill();
+                
                 // Core
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, Math.max(0.5, this.radius), 0, Math.PI * 2);
-                ctx.fillStyle = color;
-                ctx.fill();
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = '#fff';
+                context.fill();
             }
         }
 
         class Void {
             constructor(x, y) {
-                this.x = Number.isFinite(x) ? Math.max(0, Math.min(W, x)) : W / 2;
-                this.y = Number.isFinite(y) ? Math.max(0, Math.min(H, y)) : H / 2;
-                this.radius = VOID_RADIUS;
-                this.strength = VOID_STRENGTH;
+                this.x = x;
+                this.y = y;
                 this.life = 1.0;
+                this.radius = 80;
+                this.strength = CFG.voidStrength;
                 this.isSingularity = false;
-                this.echoPhase = 0;
             }
-
+            
             update(dt) {
-                this.life -= VOID_DECAY;
-                this.echoPhase += dt * 5;
+                this.life -= CFG.voidDecay;
             }
-
-            draw() {
-                if (this.life <= 0) return;
+            
+            draw(context) {
+                const r = this.radius * (0.8 + this.life*0.2);
+                const grd = context.createRadialGradient(this.x, this.y, 0, this.x, this.y, r);
                 
-                const alpha = this.life * 0.7;
-                const radius = Math.max(1, this.radius * (0.5 + this.life * 0.5));
-                
-                // Outer glow
-                const gradient = ctx.createRadialGradient(
-                    this.x, this.y, 0,
-                    this.x, this.y, Math.max(1, radius * 1.2)
-                );
-                
+                // Color Logic: Amber for normal, Blue for singularity
                 if (this.isSingularity) {
-                    gradient.addColorStop(0, `hsla(320, 100%, 60%, ${alpha})`);
-                    gradient.addColorStop(0.4, `hsla(280, 100%, 40%, ${alpha * 0.5})`);
-                    gradient.addColorStop(1, `hsla(260, 80%, 20%, 0)`);
+                    grd.addColorStop(0, `rgba(255, 255, 255, ${this.life})`);
+                    grd.addColorStop(0.4, `rgba(77, 195, 255, ${this.life * 0.8})`);
+                    grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
                 } else {
-                    gradient.addColorStop(0, `hsla(30, 100%, 60%, ${alpha})`);
-                    gradient.addColorStop(0.4, `hsla(20, 100%, 40%, ${alpha * 0.5})`);
-                    gradient.addColorStop(1, `hsla(10, 80%, 20%, 0)`);
+                    grd.addColorStop(0, `rgba(255, 255, 255, ${this.life * 0.5})`);
+                    grd.addColorStop(0.5, `rgba(255, 179, 71, ${this.life * 0.4})`);
+                    grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
                 }
                 
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, Math.max(1, radius * 1.2), 0, Math.PI * 2);
-                ctx.fillStyle = gradient;
-                ctx.fill();
-
-                // Core
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, Math.max(1, radius * 0.2), 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha * 0.8})`;
-                ctx.fill();
+                context.beginPath();
+                context.arc(this.x, this.y, r, 0, Math.PI * 2);
+                context.fillStyle = grd;
+                context.fill();
             }
         }
 
-        class TargetZone {
-            constructor(x, y, index) {
-                this.x = Number.isFinite(x) ? x : W / 2;
-                this.y = Number.isFinite(y) ? y : H / 2;
-                this.radius = 50;
-                this.capacity = TARGET_PARTICLES_COUNT;
-                this.progress = 0;
-                this.index = index;
-                this.pulsePhase = Math.random() * Math.PI * 2;
+        class Repulsor {
+            constructor(x, y, r) {
+                this.x = x;
+                this.y = y;
+                this.radius = r || 60;
+                this.strength = 30000;
+                this.phase = Math.random() * 100;
             }
-
+            
             update(dt) {
-                this.pulsePhase += dt * 2;
+                this.phase += dt * 3;
+            }
+            
+            draw(context) {
+                const pSize = this.radius + Math.sin(this.phase) * 2;
                 
-                // Check collision with Target Particles
-                for (let p of particles) {
+                context.beginPath();
+                context.arc(this.x, this.y, pSize, 0, Math.PI*2);
+                context.strokeStyle = 'rgba(255, 77, 77, 0.2)'; // Subtle red warning
+                context.lineWidth = 1;
+                context.stroke();
+                
+                const grd = context.createRadialGradient(this.x, this.y, 0, this.x, this.y, pSize);
+                grd.addColorStop(0, 'rgba(255, 77, 77, 0.05)');
+                grd.addColorStop(1, 'rgba(255, 77, 77, 0)');
+                context.fillStyle = grd;
+                context.fill();
+            }
+        }
+
+        class Target {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.r = 50;
+                this.count = 0;
+                this.cap = CFG.targetCapacity;
+            }
+            
+            update(dt) {
+                state.particles.forEach(p => {
                     if (p.type === 'target' && !p.collected) {
-                        const dx = p.x - this.x;
-                        const dy = p.y - this.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (dist < this.radius * 0.8) {
-                            // Capture particle
-                            p.collected = true;
-                            this.progress++;
-                            
-                            // Score logic
-                            const points = 50 * level * (1 + combo * 0.5);
-                            score += Math.floor(points);
-                            scoreEl.textContent = score;
-                            
-                            // Combo logic
-                            combo++;
-                            comboTimer = 2.5;
-                            comboEl.textContent = `COMBO x${combo}`;
-                            comboEl.classList.add('active');
-                            
-                            // Check win condition
-                            if (this.progress >= this.capacity) {
-                                targetsCollected++;
-                                updateProgress();
-                                if (targetsCollected >= totalTargets) {
-                                    nextLevel();
-                                }
+                        if (Math.hypot(p.x - this.x, p.y - this.y) < this.r * 0.7) {
+                            this.capture(p);
+                        }
+                    }
+                });
+            }
+            
+            capture(p) {
+                p.collected = true;
+                this.count++;
+                addScore(100, p.x, p.y);
+                
+                if (this.count >= this.cap) {
+                    state.filled++;
+                    updateUI();
+                    state.shake = 10;
+                    if (state.filled >= state.total) nextLevel();
+                }
+            }
+            
+            draw(context) {
+                context.beginPath();
+                context.arc(this.x, this.y, this.r, 0, Math.PI*2);
+                context.strokeStyle = 'rgba(61, 255, 194, 0.15)'; // Very subtle ring
+                context.lineWidth = 1;
+                context.stroke();
+                
+                // Filling arc
+                context.beginPath();
+                context.arc(this.x, this.y, this.r, -Math.PI/2, -Math.PI/2 + (Math.PI*2 * (this.count/this.cap)));
+                context.strokeStyle = 'rgba(61, 255, 194, 0.8)'; // Brighter fill
+                context.lineWidth = 2;
+                context.stroke();
+            }
+        }
+
+        // --- Logic ---
+        function addScore(val, x, y) {
+            state.score += val;
+            document.getElementById('score-val').innerText = state.score;
+            
+            const el = document.createElement('div');
+            el.className = 'floater';
+            el.innerText = '+' + val;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+        
+        function updateUI() {
+            document.getElementById('obj-fill').style.width = (state.filled/state.total * 100) + '%';
+            document.getElementById('obj-text').innerText = state.filled + ' / ' + state.total;
+            document.getElementById('entropy-fill').style.width = state.entropy + '%';
+        }
+
+        function nextLevel() {
+            state.level++;
+            document.getElementById('level-val').innerText = 'Sector ' + state.level;
+            const overlay = document.getElementById('overlay-text');
+            overlay.classList.add('show');
+            
+            setTimeout(() => {
+                overlay.classList.remove('show');
+                state.filled = 0;
+                state.total = Math.min(state.level + 2, 10);
+                createLevel();
+                updateUI();
+            }, 1500);
+        }
+
+        function createLevel() {
+            state.particles = [];
+            state.voids = [];
+            state.targets = [];
+            state.repulsors = [];
+            
+            // Targets
+            for(let i=0; i<state.total; i++) {
+                const x = (i+1) * (W / (state.total+1));
+                const y = H/2 + (Math.random()-0.5) * 200;
+                state.targets.push(new Target(x, y));
+            }
+            
+            // Repulsors
+            const repCount = Math.floor(state.level / 2);
+            for(let i=0; i<repCount; i++) {
+                let x = Math.random() * W;
+                let y = Math.random() * H;
+                let valid = true;
+                state.targets.forEach(t => {
+                    if (Math.hypot(x-t.x, y-t.y) < 200) valid = false;
+                });
+                if(valid) state.repulsors.push(new Repulsor(x, y, 40 + Math.random()*40));
+            }
+            
+            // Particles
+            const totalTargetParticles = state.total * CFG.targetCapacity;
+            for(let i=0; i<totalTargetParticles; i++) state.particles.push(new Particle(null, null, 'target'));
+            for(let i=0; i<CFG.particleCount; i++) state.particles.push(new Particle(null, null, 'ambient'));
+        }
+
+        function init() {
+            state = {
+                particles: [], voids: [], targets: [], repulsors: [],
+                score: 0, level: 1, entropy: 100, filled: 0, total: 5, playing: true, shake: 0
+            };
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('score-val').innerText = '0';
+            document.getElementById('level-val').innerText = 'Sector 1';
+            createLevel();
+            updateUI();
+        }
+
+        // --- Loop ---
+        function loop(time) {
+            const dt = Math.min((time - lastTime) / 1000, 0.05);
+            lastTime = time;
+
+            if (state.playing) {
+                if (mouse.down && state.entropy > 0) {
+                    state.entropy -= dt * 30; 
+                    if (state.entropy < 0) state.entropy = 0;
+                    
+                    const exists = state.voids.find(v => Math.hypot(v.x-mouse.x, v.y-mouse.y) < 40 && v.life > 0.5);
+                    if (!exists && state.voids.length < 10) {
+                        state.voids.push(new Void(mouse.x, mouse.y));
+                    }
+                } else {
+                    state.entropy += dt * 15;
+                    if (state.entropy > 100) state.entropy = 100;
+                }
+                updateUI();
+                
+                // Singularity Merging
+                for (let i = 0; i < state.voids.length; i++) {
+                    for (let j = i + 1; j < state.voids.length; j++) {
+                        if (state.voids[i].life > 0 && state.voids[j].life > 0) {
+                            if (Math.hypot(state.voids[i].x - state.voids[j].x, state.voids[i].y - state.voids[j].y) < state.voids[i].radius) {
+                                state.voids[i].isSingularity = true;
+                                state.voids[i].strength *= 1.2;
+                                state.voids[i].radius += 10;
+                                state.voids[i].life += 0.3;
+                                state.voids[j].life = 0;
+                                addScore(500, state.voids[i].x, state.voids[i].y);
                             }
                         }
                     }
                 }
+
+                state.voids.forEach(v => v.update(dt));
+                state.repulsors.forEach(r => r.update(dt));
+                state.particles.forEach(p => p.update(dt));
+                state.targets.forEach(t => t.update(dt));
+                
+                state.voids = state.voids.filter(v => v.life > 0);
+                state.shake *= 0.9;
             }
 
-            draw() {
-                const pulse = Math.sin(this.pulsePhase) * 0.1 + 1;
-                
-                // Outer ring
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * pulse, 0, Math.PI * 2);
-                ctx.strokeStyle = `hsla(170, 70%, 50%, 0.5)`;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Inner ring
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * 0.5 * pulse, 0, Math.PI * 2);
-                ctx.strokeStyle = `hsla(170, 70%, 60%, 0.3)`;
-                ctx.stroke();
+            // Draw
+            ctx.clearRect(0, 0, W, H);
+            bloomCtx.clearRect(0, 0, W, H);
+            
+            ctx.save();
+            if (state.shake > 0.5) ctx.translate((Math.random()-0.5)*state.shake, (Math.random()-0.5)*state.shake);
 
-                // Fill indicator
-                if (this.progress > 0 && this.progress < this.capacity) {
-                    ctx.fillStyle = `hsla(170, 70%, 60%, 0.2)`;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius * (this.progress/this.capacity), 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                // Full indicator
-                if (this.progress >= this.capacity) {
-                    ctx.fillStyle = `hsla(170, 80%, 60%, 0.4)`;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = `hsla(170, 80%, 80%, 0.8)`;
-                    ctx.stroke();
-                }
-            }
-        }
-
-        function createParticles() {
-            particles = [];
-            const ambientCount = PARTICLE_COUNT_BASE + level * 20;
-            
-            // Ambient particles (Orange/Noise)
-            for (let i = 0; i < ambientCount; i++) {
-                particles.push(new Particle(
-                    Math.random() * W,
-                    Math.random() * H,
-                    'ambient'
-                ));
-            }
-            
-            // Target Particles (Cyan)
-            // Spawn them scattered, away from targets
-            const targetParticleCount = totalTargets * TARGET_PARTICLES_COUNT;
-            for (let i = 0; i < targetParticleCount; i++) {
-                let safeX, safeY, valid;
-                let attempts = 0;
-                
-                do {
-                    valid = true;
-                    safeX = Math.random() * W;
-                    safeY = Math.random() * H;
-                    
-                    // Don't spawn inside a target
-                    for(let t of targets) {
-                        const dx = t.x - safeX;
-                        const dy = t.y - safeY;
-                        if (Math.sqrt(dx*dx + dy*dy) < 150) {
-                            valid = false;
-                            break;
-                        }
-                    }
-                    attempts++;
-                } while (!valid && attempts < 50);
-                
-                particles.push(new Particle(safeX, safeY, 'target'));
-            }
-        }
-
-        function createTargets() {
-            targets = [];
-            targetsCollected = 0;
-            totalTargets = 2 + Math.floor(level / 2);
-            
-            const margin = 150;
-            for (let i = 0; i < totalTargets; i++) {
-                let x, y, valid;
-                let attempts = 0;
-                
-                do {
-                    valid = true;
-                    x = margin + Math.random() * (W - margin * 2);
-                    y = margin + Math.random() * (H - margin * 2);
-                    
-                    for (let t of targets) {
-                        const dx = t.x - x;
-                        const dy = t.y - y;
-                        if (Math.sqrt(dx * dx + dy * dy) < 200) {
-                            valid = false;
-                            break;
-                        }
-                    }
-                    attempts++;
-                } while (!valid && attempts < 100);
-                
-                targets.push(new TargetZone(x, y, i));
-            }
-            
-            updateProgress();
-        }
-
-        function updateProgress() {
-            targetCountEl.textContent = `${targetsCollected} / ${totalTargets}`;
-            progressFill.style.width = `${(targetsCollected / totalTargets) * 100}%`;
-        }
-
-        function nextLevel() {
-            level++;
-            levelEl.textContent = `Level ${level}`;
-            
-            // Visual feedback
-            levelUpEl.classList.add('show');
-            setTimeout(() => levelUpEl.classList.remove('show'), 1500);
-            
-            voids = [];
-            targets = [];
-            particles = [];
-            
-            // Rebuild level
-            createTargets();
-            createParticles();
-        }
-
-        function checkSingularity() {
-            for (let i = 0; i < voids.length; i++) {
-                if (voids[i].life <= 0) continue;
-                
-                for (let j = i + 1; j < voids.length; j++) {
-                    if (voids[j].life <= 0) continue;
-                    
-                    const dx = voids[i].x - voids[j].x;
-                    const dy = voids[i].y - voids[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    // If voids overlap significantly
-                    if (dist < (voids[i].radius + voids[j].radius) * 0.5) {
-                        // Merge into Singularity at i
-                        voids[i].isSingularity = true;
-                        voids[i].strength *= 1.5; // Boost strength
-                        voids[i].radius = Math.max(voids[i].radius, voids[j].radius) * 1.2;
-                        voids[i].life = Math.min(voids[i].life + 0.2, 1);
-                        voids[j].life = 0; // Kill j
-                        
-                        singularityBonus += 0.5;
-                    }
-                }
-            }
-        }
-
-        function restart() {
-            score = 0;
-            level = 1;
-            combo = 0;
-            singularityBonus = 0;
-            isPlaying = true;
-            gameStarted = false;
-            
-            scoreEl.textContent = '0';
-            levelEl.textContent = 'Level 1';
-            comboEl.classList.remove('active');
-            gameOverEl.style.display = 'none';
-            instructionsEl.style.opacity = '1';
-            
-            voids = [];
-            particles = [];
-            targets = [];
-            
-            createTargets();
-            createParticles();
-        }
-
-        function update(time) {
-            // Delta time calculation with safety clamp
-            const dt = Math.min((time - lastTime) / 1000, 0.1);
-            lastTime = time;
-
-            if (isMouseDown && isPlaying) {
-                gameStarted = true;
-                
-                // Check if we should add a new void
-                // Limit max voids to prevent lag/overlap spam
-                const activeVoids = voids.filter(v => v.life > 0).length;
-                
-                if (activeVoids < 10) {
-                    // Check distance to nearest active void
-                    const canCreate = !voids.some(v => {
-                        const dx = v.x - mouseX;
-                        const dy = v.y - mouseY;
-                        return Math.sqrt(dx*dx + dy*dy) < 40 && v.life > 0.2;
-                    });
-                    
-                    if (canCreate) {
-                        voids.push(new Void(mouseX, mouseY));
+            // Constellation Lines (Subtle)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)'; // Very faint
+            ctx.lineWidth = 0.5;
+            // Simple logic: connect only target particles
+            for (let i = 0; i < state.particles.length; i++) {
+                if (state.particles[i].type !== 'target' || state.particles[i].collected) continue;
+                for (let j = i + 1; j < state.particles.length; j++) {
+                    if (state.particles[j].type !== 'target' || state.particles[j].collected) continue;
+                    const dist = Math.hypot(state.particles[i].x - state.particles[j].x, state.particles[i].y - state.particles[j].y);
+                    if (dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(state.particles[i].x, state.particles[i].y);
+                        ctx.lineTo(state.particles[j].x, state.particles[j].y);
+                        ctx.stroke();
                     }
                 }
             }
 
-            // Update Voids
-            voids.forEach(v => v.update(dt));
-            voids = voids.filter(v => v.life > 0);
+            state.repulsors.forEach(r => r.draw(ctx));
+            state.targets.forEach(t => t.draw(ctx));
             
-            checkSingularity();
-
-            // Update Particles
-            particles.forEach(p => p.update(dt));
+            // Draw Particles on both layers
+            state.particles.forEach(p => p.draw(ctx));
+            state.particles.forEach(p => p.draw(bloomCtx));
             
-            // Update Targets
-            targets.forEach(t => t.update(dt));
-
-            // Combo Timer
-            if (comboTimer > 0) {
-                comboTimer -= dt;
-                if (comboTimer <= 0) {
-                    combo = 0;
-                    singularityBonus = 0;
-                    comboEl.classList.remove('active');
-                }
-            }
-
-            // Hide instructions
-            if (gameStarted && isPlaying) {
-                instructionsEl.style.opacity = '0';
-            }
-        }
-
-        function draw() {
-            // Clear screen
-            ctx.fillStyle = '#0a0a0f';
-            ctx.fillRect(0, 0, W, H);
-
-            // Draw Targets (Background layer)
-            targets.forEach(t => t.draw());
+            state.voids.forEach(v => v.draw(ctx));
             
-            // Draw Particles
-            particles.forEach(p => p.draw());
+            ctx.restore();
             
-            // Draw Voids (Top layer)
-            voids.forEach(v => v.draw());
+            requestAnimationFrame(loop);
         }
 
-        function gameLoop(t) {
-            update(t);
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Input Handlers
-        function handleInputStart(x, y) {
-            isMouseDown = true;
-            mouseX = x;
-            mouseY = y;
-            cursor.classList.add('active');
-        }
-
-        function handleInputMove(x, y) {
-            mouseX = x;
-            mouseY = y;
-            cursor.style.left = mouseX + 'px';
-            cursor.style.top = mouseY + 'px';
-        }
-
-        function handleInputEnd() {
-            isMouseDown = false;
-            cursor.classList.remove('active');
-        }
-
-        // Mouse Events
-        window.addEventListener('mousedown', (e) => {
-            handleInputStart(e.clientX, e.clientY);
+        // --- Input ---
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            const c = document.getElementById('cursor');
+            c.style.left = e.clientX + 'px';
+            c.style.top = e.clientY + 'px';
         });
-
-        window.addEventListener('mousemove', (e) => {
-            handleInputMove(e.clientX, e.clientY);
+        
+        window.addEventListener('mousedown', () => {
+            mouse.down = true;
+            document.getElementById('cursor').classList.add('active');
         });
-
-        window.addEventListener('mouseup', handleInputEnd);
-
-        // Touch Events
-        window.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleInputStart(touch.clientX, touch.clientY);
-            handleInputMove(touch.clientX, touch.clientY); // Sync cursor
-        }, { passive: false });
-
-        window.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleInputMove(touch.clientX, touch.clientY);
-        }, { passive: false });
-
-        window.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            handleInputEnd();
-        }, { passive: false });
-
-        // Button
-        restartBtn.addEventListener('click', restart);
-
-        // Init Game
-        createTargets();
-        createParticles();
         
-        // Center cursor init
-        cursor.style.left = mouseX + 'px';
-        cursor.style.top = mouseY + 'px';
+        window.addEventListener('mouseup', () => {
+            mouse.down = false;
+            document.getElementById('cursor').classList.remove('active');
+        });
         
-        requestAnimationFrame(gameLoop);
+        window.addEventListener('touchstart', e => { 
+            e.preventDefault();
+            mouse.down = true; 
+            mouse.x = e.touches[0].clientX; 
+            mouse.y = e.touches[0].clientY; 
+            document.getElementById('cursor').classList.add('active');
+        }, {passive:false});
+        
+        window.addEventListener('touchmove', e => { 
+            e.preventDefault();
+            mouse.x = e.touches[0].clientX; 
+            mouse.y = e.touches[0].clientY; 
+            const c = document.getElementById('cursor');
+            c.style.left = mouse.x + 'px';
+            c.style.top = mouse.y + 'px';
+        }, {passive:false});
+        
+        window.addEventListener('touchend', () => {
+            mouse.down = false;
+            document.getElementById('cursor').classList.remove('active');
+        });
+        
+        document.getElementById('restart-btn').addEventListener('click', init);
+
+        init();
+        requestAnimationFrame(loop);
     </script>
 </body>
 </html>
